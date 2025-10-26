@@ -6,6 +6,37 @@ SkillChain is a Web3 application built on the Solana blockchain that enables use
 
 The application combines educational testing with blockchain technology to create immutable proof of professional skills, targeting a user experience inspired by modern Web3 platforms (Phantom, Magic Eden) and educational platforms (Duolingo, Coursera).
 
+**Current Environment:** The project is now fully configured and running on Replit.
+
+## Recent Changes (October 26, 2025)
+
+### Fixed Critical Payment Verification Issues
+
+**Issue #1: Treasury Wallet Mismatch**
+- **Problem:** Treasury wallet addresses were mismatched between frontend and backend, causing SOL to be sent but tests not generated
+- **Solution:** Synchronized treasury wallet address to `9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g` across both frontend and backend
+- **Impact:** Payment verification now works correctly - SOL payments are properly verified before test generation
+
+**Issue #2: Response Parsing Error (Test Generation)**
+- **Problem:** Frontend was not parsing JSON from server response, causing test data to be lost even when payment was successful
+- **Solution:** Added `.json()` call to parse server response in `client/src/pages/tests.tsx`
+- **Code Change:** Changed from `return response` to `const result = await response.json() as GenerateTestResponse; return result;`
+- **Impact:** Test generation now works end-to-end - after payment, user is redirected to test page with generated questions
+
+**Issue #3: Response Parsing Error (Test Submission)**
+- **Problem:** After completing a test and clicking submit, the app crashed with "Cannot read properties of undefined (reading 'toUpperCase')" because `testResult.level` was undefined
+- **Solution:** Added `.json()` call to parse server response in `client/src/pages/test-taking.tsx` (same issue as #2)
+- **Code Change:** In `submitTestMutation`, changed from `const result = await apiRequest<TestResult>('POST', '/api/tests/submit', data); return result;` to `const response = await apiRequest('POST', '/api/tests/submit', data); const result = await response.json() as TestResult; return result;`
+- **Impact:** Test submission now works correctly - users see their score, level (Junior/Middle/Senior), SOL reward, and NFT certificate confirmation
+
+### Replit Environment Setup
+- Installed all npm dependencies
+- Configured workflow to run development server on port 5000
+- Added GEMINI_API_KEY secret for AI test generation
+- Confirmed DATABASE_URL is available for future PostgreSQL integration
+- Set up deployment configuration for production (autoscale)
+- Created .gitignore file with proper Node.js/TypeScript exclusions
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

@@ -32,7 +32,8 @@ export default function TestTaking() {
 
   const submitTestMutation = useMutation({
     mutationFn: async (data: { testId: string; walletAddress: string; answers: number[] }) => {
-      const result = await apiRequest<TestResult>('POST', '/api/tests/submit', data);
+      const response = await apiRequest('POST', '/api/tests/submit', data);
+      const result = await response.json() as TestResult;
       return result;
     },
     onSuccess: (result) => {

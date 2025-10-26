@@ -19,7 +19,7 @@ import {
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
 // Treasury wallet address - in production this should be from env variable
-const TREASURY_WALLET = new PublicKey("9vTMjodfMrxPY2Jv8F7s3MmK7CJYWwWjLQ5A3BVDGznx");
+const TREASURY_WALLET = new PublicKey("9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g");
 const TEST_PRICE_LAMPORTS = 1 * LAMPORTS_PER_SOL;
 
 // Track used signatures to prevent replay attacks

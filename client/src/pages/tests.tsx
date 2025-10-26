@@ -48,11 +48,12 @@ export default function Tests() {
       console.log('Payment confirmed:', signature);
 
       // Step 2: Generate test after payment confirmed, include signature for backend verification
-      const response = await apiRequest<GenerateTestResponse>('POST', '/api/tests/generate', {
+      const response = await apiRequest('POST', '/api/tests/generate', {
         ...data,
         paymentSignature: signature,
       });
-      return response;
+      const result = await response.json() as GenerateTestResponse;
+      return result;
     },
     onSuccess: (data) => {
       if (data.test) {
