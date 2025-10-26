@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import type { Question } from "@shared/schema";
+import type { Question, Category } from "@shared/schema";
 
 // DON'T DELETE THIS COMMENT
 // Follow these instructions when using this blueprint:
@@ -16,15 +16,130 @@ interface GeneratedTest {
   }>;
 }
 
-export async function generateTestQuestions(topic: string): Promise<Question[]> {
+interface GeneratedCategories {
+  categories: Array<{
+    name: string;
+  }>;
+}
+
+// Generate categories based on level and parent category
+export async function generateCategories(level: number, parentCategory?: string): Promise<Category[]> {
   try {
-    const systemPrompt = `You are an expert test creator. Generate exactly 5 multiple-choice questions about "${topic}".
+    let systemPrompt = "";
+    let userPrompt = "";
+
+    if (level === 1) {
+      // Main categories
+      systemPrompt = `You are an expert in professional skills and career development. Generate exactly 8 main professional categories for skill testing.
+
+Categories should cover diverse areas like:
+- Technology/Development
+- Design/Creative
+- Business/Management
+- Marketing/Sales
+- Data/Analytics
+- Operations/Support
+- etc.
+
+Respond with JSON in this exact format:
+{
+  "categories": [
+    { "name": "Category Name" }
+  ]
+}`;
+      userPrompt = "Generate 8 diverse main professional categories for skill assessment";
+    } else if (level === 2) {
+      // Narrow categories
+      systemPrompt = `You are an expert in professional skills. Generate exactly 6 narrower subcategories within "${parentCategory}".
+
+These should be specific areas within ${parentCategory} that professionals specialize in.
+
+Respond with JSON in this exact format:
+{
+  "categories": [
+    { "name": "Subcategory Name" }
+  ]
+}`;
+      userPrompt = `Generate 6 specific subcategories within ${parentCategory}`;
+    } else {
+      // Specific categories
+      systemPrompt = `You are an expert in professional skills. Generate exactly 5 very specific skill areas within "${parentCategory}".
+
+These should be concrete, testable skills or technologies that professionals work with.
+
+Respond with JSON in this exact format:
+{
+  "categories": [
+    { "name": "Specific Skill Name" }
+  ]
+}`;
+      userPrompt = `Generate 5 specific testable skills within ${parentCategory}`;
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            categories: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" }
+                },
+                required: ["name"]
+              }
+            }
+          },
+          required: ["categories"]
+        }
+      },
+      contents: userPrompt,
+    });
+
+    const rawJson = response.text;
+
+    if (!rawJson) {
+      throw new Error("Empty response from Gemini");
+    }
+
+    const data: GeneratedCategories = JSON.parse(rawJson);
+
+    // Convert to Category[] format with IDs
+    return data.categories.map((cat, index) => ({
+      id: `cat-${level}-${index + 1}`,
+      name: cat.name,
+      level,
+    }));
+
+  } catch (error) {
+    console.error("Error generating categories:", error);
+    throw new Error(`Failed to generate categories: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// Generate 10 test questions (updated from 5)
+export async function generateTestQuestions(
+  mainCategory: string,
+  narrowCategory: string,
+  specificCategory: string
+): Promise<Question[]> {
+  try {
+    const topic = `${mainCategory} > ${narrowCategory} > ${specificCategory}`;
+    const systemPrompt = `You are an expert test creator. Generate exactly 10 multiple-choice questions about "${specificCategory}" in the context of "${narrowCategory}" and "${mainCategory}".
+
 Each question should:
 1. Be clear and specific
 2. Have exactly 4 options
 3. Have only one correct answer
 4. Be challenging but fair
 5. Test practical knowledge
+6. Be worth 10 points each (total 100 points)
+7. Progress from easier to harder
 
 Respond with JSON in this exact format:
 {
@@ -66,7 +181,7 @@ The correctAnswer is the index (0-3) of the correct option.`;
           required: ["questions"]
         }
       },
-      contents: `Generate 5 challenging multiple-choice questions about: ${topic}`,
+      contents: `Generate 10 challenging multiple-choice questions about: ${topic}`,
     });
 
     const rawJson = response.text;
@@ -77,16 +192,17 @@ The correctAnswer is the index (0-3) of the correct option.`;
 
     const data: GeneratedTest = JSON.parse(rawJson);
 
-    if (!data.questions || data.questions.length !== 5) {
+    if (!data.questions || data.questions.length !== 10) {
       throw new Error("Invalid number of questions generated");
     }
 
-    // Convert to Question[] format with IDs
+    // Convert to Question[] format with IDs and points
     return data.questions.map((q, index) => ({
       id: `q-${index + 1}`,
       question: q.question,
       options: q.options,
       correctAnswer: q.correctAnswer,
+      points: 10, // Each question worth 10 points
     }));
 
   } catch (error) {

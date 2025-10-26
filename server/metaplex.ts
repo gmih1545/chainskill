@@ -29,19 +29,33 @@ export async function mintCertificateNFT(
   score: number
 ): Promise<{ mint: string; metadataUri: string }> {
   try {
-    // Create metadata for the certificate NFT
+    const timestamp = new Date().toISOString();
+    const levelEmoji = level === "Senior" ? "🏆" : level === "Middle" ? "⭐" : "✨";
+    
+    // Create enhanced metadata for the certificate NFT following Metaplex standards
     const metadata: NFTMetadata = {
-      name: `${topic} - ${level} Certificate`,
-      symbol: "SKILL",
-      description: `Professional ${level} level certificate for ${topic}. Score: ${score}/5. Issued by SkillChain on Solana.`,
-      image: `https://skillchain.app/certificates/${level.toLowerCase()}.png`,
+      name: `${levelEmoji} ${level} - ${topic}`,
+      symbol: "SKLCHN",
+      description: `SkillChain Professional Certificate\n\n` +
+        `🎓 Level: ${level}\n` +
+        `📊 Score: ${score}/100 points\n` +
+        `📚 Skill: ${topic}\n` +
+        `🔐 Blockchain: Solana Devnet\n` +
+        `⏰ Issued: ${new Date(timestamp).toLocaleDateString()}\n\n` +
+        `This NFT certificate is a verifiable proof of skill assessment on the Solana blockchain. ` +
+        `The holder has demonstrated ${level.toLowerCase()}-level proficiency in ${topic}.`,
+      image: `https://api.dicebear.com/7.x/shapes/svg?seed=${level}-${encodeURIComponent(topic)}&backgroundColor=7c3aed,4f46e5,2563eb`,
       attributes: [
-        { trait_type: "Topic", value: topic },
+        { trait_type: "Certificate Type", value: "Skill Assessment" },
         { trait_type: "Level", value: level },
         { trait_type: "Score", value: score },
-        { trait_type: "Max Score", value: 5 },
+        { trait_type: "Max Score", value: 100 },
+        { trait_type: "Skill Area", value: topic },
         { trait_type: "Platform", value: "SkillChain" },
-        { trait_type: "Blockchain", value: "Solana Devnet" },
+        { trait_type: "Network", value: "Solana Devnet" },
+        { trait_type: "Issue Date", value: new Date(timestamp).toLocaleDateString() },
+        { trait_type: "Wallet", value: recipientAddress.slice(0, 8) + "..." + recipientAddress.slice(-6) },
+        { trait_type: "Achievement Tier", value: score >= 90 ? "Elite" : score >= 80 ? "Advanced" : "Professional" },
       ],
     };
 

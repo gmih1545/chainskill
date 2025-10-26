@@ -2,28 +2,29 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { Connection, clusterApiUrl, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { storage } from "./storage";
-import { generateTestQuestions } from "./gemini";
+import { generateTestQuestions, generateCategories } from "./gemini";
 import { mintCertificateNFT } from "./metaplex";
 import { randomUUID } from "crypto";
 import { 
   generateTestRequestSchema, 
   testSubmissionSchema,
+  getCategoriesRequestSchema,
   type Test,
   type TestResult,
   type Certificate,
   type UserStats,
-  type GenerateTestResponse
+  type GenerateTestResponse,
+  type GetCategoriesResponse
 } from "@shared/schema";
 
 // Solana connection for payment verification
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-// Treasury wallet address - in production this should be from env variable
-const TREASURY_WALLET = new PublicKey("9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g");
+// Treasury wallet address from environment variable
+const TREASURY_WALLET = new PublicKey(
+  process.env.TREASURY_WALLET || "9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g"
+);
 const TEST_PRICE_LAMPORTS = 1 * LAMPORTS_PER_SOL;
-
-// Track used signatures to prevent replay attacks
-const usedSignatures = new Set<string>();
 
 // Verify payment transaction on-chain
 async function verifyPaymentTransaction(
@@ -31,8 +32,9 @@ async function verifyPaymentTransaction(
   expectedSender: string
 ): Promise<boolean> {
   try {
-    // Check if signature already used
-    if (usedSignatures.has(signature)) {
+    // Check if signature already used (database check)
+    const isUsed = await storage.isPaymentSignatureUsed(signature);
+    if (isUsed) {
       console.error("Payment signature already used:", signature);
       return false;
     }
@@ -88,8 +90,8 @@ async function verifyPaymentTransaction(
       return false;
     }
 
-    // Mark signature as used
-    usedSignatures.add(signature);
+    // Mark signature as used in database
+    await storage.markPaymentSignatureUsed(signature, expectedSender, treasuryBalanceChange);
     
     console.log("Payment verified successfully:", {
       signature,
@@ -105,6 +107,29 @@ async function verifyPaymentTransaction(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Get AI-generated categories
+  app.post("/api/categories", async (req, res) => {
+    try {
+      const validated = getCategoriesRequestSchema.parse(req.body);
+      
+      const categories = await generateCategories(
+        validated.level,
+        validated.parentCategory
+      );
+
+      const response: GetCategoriesResponse = {
+        categories,
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error generating categories:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to generate categories" 
+      });
+    }
+  });
+
   // Generate a new test
   app.post("/api/tests/generate", async (req, res) => {
     try {
@@ -122,13 +147,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Generate questions using Gemini AI
-      const questions = await generateTestQuestions(validated.topic);
+      // Generate 10 questions using Gemini AI based on categories
+      const questions = await generateTestQuestions(
+        validated.mainCategory,
+        validated.narrowCategory,
+        validated.specificCategory
+      );
       
-      // Create test object
+      // Create test object with categories
+      const topic = `${validated.mainCategory} > ${validated.narrowCategory} > ${validated.specificCategory}`;
       const test: Test = {
         id: `${validated.walletAddress}-${randomUUID()}`,
-        topic: validated.topic,
+        topic,
+        mainCategory: validated.mainCategory,
+        narrowCategory: validated.narrowCategory,
+        specificCategory: validated.specificCategory,
         questions,
         createdAt: new Date().toISOString(),
       };
@@ -189,7 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Test not found" });
       }
 
-      // Calculate score
+      // Calculate score (10 questions × 10 points each = 100 points max)
       let correctAnswers = 0;
       test.questions.forEach((question, index) => {
         if (validated.answers[index] === question.correctAnswer) {
@@ -197,70 +230,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Determine level based on score
-      let level: "Junior" | "Middle" | "Senior";
-      if (correctAnswers === 5) {
-        level = "Senior";
-      } else if (correctAnswers >= 3) {
-        level = "Middle";
-      } else {
-        level = "Junior";
-      }
+      const totalQuestions = test.questions.length; // Should be 10
+      const totalPoints = 100;
+      const score = correctAnswers * 10; // Each correct answer = 10 points
 
-      // Calculate SOL reward (10% of test price)
-      const solReward = 0.1;
+      // Determine level and if passed based on new scoring system
+      let level: "Junior" | "Middle" | "Senior" | "Failed";
+      let passed = false;
+      let solReward = 0;
+
+      if (score >= 90) {
+        level = "Senior";
+        passed = true;
+        solReward = 0.15; // 15% reward for Senior
+      } else if (score >= 80) {
+        level = "Middle";
+        passed = true;
+        solReward = 0.12; // 12% reward for Middle
+      } else if (score >= 70) {
+        level = "Junior";
+        passed = true;
+        solReward = 0.1; // 10% reward for Junior
+      } else {
+        level = "Failed";
+        passed = false;
+        solReward = 0; // No reward if failed
+      }
 
       // Create test result
       const result: TestResult = {
         testId: validated.testId,
+        walletAddress: validated.walletAddress,
         topic: test.topic,
-        score: correctAnswers,
+        score,
         level,
         correctAnswers,
-        totalQuestions: test.questions.length,
+        totalQuestions,
+        totalPoints,
         solReward,
+        passed,
         completedAt: new Date().toISOString(),
       };
 
       await storage.createTestResult(result);
 
-      // Mint NFT certificate using Metaplex
-      let nftData;
-      try {
-        nftData = await mintCertificateNFT(
-          validated.walletAddress,
-          test.topic,
-          level,
-          correctAnswers
-        );
-        console.log("NFT minted successfully:", nftData);
-      } catch (error) {
-        console.error("NFT minting failed:", error);
-        // Continue with mock data if minting fails
-        nftData = {
-          mint: `MOCK-${randomUUID().slice(0, 8)}`,
-          metadataUri: `https://arweave.net/${randomUUID()}`,
+      // Only mint NFT certificate if passed (score >= 70)
+      let nftData = null;
+      let certificate = null;
+
+      if (passed) {
+        try {
+          nftData = await mintCertificateNFT(
+            validated.walletAddress,
+            test.topic,
+            level as "Junior" | "Middle" | "Senior",
+            score
+          );
+          console.log("NFT minted successfully:", nftData);
+        } catch (error) {
+          console.error("NFT minting failed:", error);
+          // Continue with mock data if minting fails
+          nftData = {
+            mint: `MOCK-${randomUUID().slice(0, 8)}`,
+            metadataUri: `https://arweave.net/${randomUUID()}`,
+          };
+        }
+
+        // Create certificate only if passed
+        certificate = {
+          id: randomUUID(),
+          walletAddress: validated.walletAddress,
+          topic: test.topic,
+          level: level as "Junior" | "Middle" | "Senior",
+          score,
+          nftMint: nftData.mint,
+          nftMetadataUri: nftData.metadataUri,
+          earnedAt: new Date().toISOString(),
         };
+
+        await storage.createCertificate(certificate);
       }
 
-      // Create certificate
-      const certificate: Certificate = {
-        id: randomUUID(),
-        walletAddress: validated.walletAddress,
-        topic: test.topic,
-        level,
-        score: correctAnswers,
-        nftMint: nftData.mint,
-        nftMetadataUri: nftData.metadataUri,
-        earnedAt: new Date().toISOString(),
-      };
-
-      await storage.createCertificate(certificate);
-
-      // Update user stats
+      // Update user stats (only increment certificates if passed)
       const stats = await storage.getUserStats(validated.walletAddress);
       const newTotalTests = stats.totalTests + 1;
-      const newTotalCertificates = stats.totalCertificates + 1;
+      const newTotalCertificates = passed ? stats.totalCertificates + 1 : stats.totalCertificates;
       const newTotalSolEarned = stats.totalSolEarned + solReward;
       const newSuccessRate = Math.round((newTotalCertificates / newTotalTests) * 100);
 
@@ -276,6 +330,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalCertificates: newTotalCertificates,
         totalSolEarned: newTotalSolEarned,
         successRate: newSuccessRate,
+        passed,
+        score,
+        level,
       });
 
       res.json(result);

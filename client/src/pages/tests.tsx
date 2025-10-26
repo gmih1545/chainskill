@@ -1,26 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Loader2, Sparkles, AlertCircle, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TEST_PRICE_SOL, TEST_PRICE_LAMPORTS, TREASURY_WALLET } from '@/lib/solana';
 import { apiRequest } from '@/lib/queryClient';
-import type { GenerateTestResponse } from '@shared/schema';
+import type { GenerateTestResponse, Category, GetCategoriesResponse } from '@shared/schema';
 
 export default function Tests() {
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [, setLocation] = useLocation();
-  const [topic, setTopic] = useState('');
+  
+  // Category selection state
+  const [step, setStep] = useState(1); // 1 = main, 2 = narrow, 3 = specific, 4 = payment
+  const [mainCategory, setMainCategory] = useState('');
+  const [narrowCategory, setNarrowCategory] = useState('');
+  const [specificCategory, setSpecificCategory] = useState('');
+
+  // Fetch categories for current step
+  const { data: categories, isLoading: loadingCategories, refetch: refetchCategories } = useQuery<GetCategoriesResponse>({
+    queryKey: ['/api/categories', step, mainCategory, narrowCategory],
+    queryFn: async () => {
+      const response = await apiRequest('POST', '/api/categories', {
+        level: step,
+        parentCategory: step === 2 ? mainCategory : step === 3 ? narrowCategory : undefined,
+      });
+      return response.json();
+    },
+    enabled: !!publicKey && step <= 3,
+  });
 
   const generateTestMutation = useMutation({
-    mutationFn: async (data: { topic: string; walletAddress: string }) => {
+    mutationFn: async (data: { 
+      mainCategory: string; 
+      narrowCategory: string; 
+      specificCategory: string;
+      walletAddress: string;
+    }) => {
       if (!publicKey) throw new Error('Wallet not connected');
 
       // Step 1: Create and send SOL payment transaction
@@ -47,7 +68,7 @@ export default function Tests() {
 
       console.log('Payment confirmed:', signature);
 
-      // Step 2: Generate test after payment confirmed, include signature for backend verification
+      // Step 2: Generate test after payment confirmed
       const response = await apiRequest('POST', '/api/tests/generate', {
         ...data,
         paymentSignature: signature,
@@ -62,12 +83,39 @@ export default function Tests() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!publicKey || !topic.trim()) return;
+  const handleCategorySelect = (category: string) => {
+    if (step === 1) {
+      setMainCategory(category);
+      setStep(2);
+    } else if (step === 2) {
+      setNarrowCategory(category);
+      setStep(3);
+    } else if (step === 3) {
+      setSpecificCategory(category);
+      setStep(4);
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 1) {
+      setStep(step - 1);
+      if (step === 2) {
+        setMainCategory('');
+      } else if (step === 3) {
+        setNarrowCategory('');
+      } else if (step === 4) {
+        setSpecificCategory('');
+      }
+    }
+  };
+
+  const handleGenerateTest = () => {
+    if (!publicKey) return;
 
     generateTestMutation.mutate({
-      topic: topic.trim(),
+      mainCategory,
+      narrowCategory,
+      specificCategory,
       walletAddress: publicKey.toString(),
     });
   };
@@ -86,6 +134,13 @@ export default function Tests() {
     );
   }
 
+  const stepTitles = {
+    1: "Choose Main Category",
+    2: "Choose Specialization",
+    3: "Choose Specific Skill",
+    4: "Confirm & Pay"
+  };
+
   return (
     <div className="min-h-screen py-12 sm:py-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -100,141 +155,196 @@ export default function Tests() {
               Generate Your <span className="gradient-text">Skill Test</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Enter any skill or topic, and our AI will create a custom 5-question test for you. Pass to earn your NFT certificate!
+              Select your skill area step by step, and our AI will create a custom 10-question test. Score 70+ to earn your NFT certificate!
             </p>
           </div>
 
-          {/* Test Generation Form */}
-          <Card className="p-8 sm:p-12 space-y-8 animate-scale-in border-card-border">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="topic" className="text-lg font-semibold">
-                  What skill do you want to test?
-                </Label>
-                <Input
-                  id="topic"
-                  type="text"
-                  placeholder="e.g., React Hooks, Solana Smart Contracts, Python Data Science..."
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className="h-14 text-lg"
-                  disabled={generateTestMutation.isPending}
-                  data-testid="input-test-topic"
-                  autoFocus
-                />
-                <p className="text-sm text-muted-foreground">
-                  Be specific! The more detailed your topic, the better the questions.
-                </p>
-              </div>
-
-              {generateTestMutation.error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    {generateTestMutation.error instanceof Error
-                      ? generateTestMutation.error.message
-                      : 'Failed to generate test. Please try again.'}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="flex-1 h-14 text-lg gap-2"
-                  disabled={!topic.trim() || generateTestMutation.isPending}
-                  data-testid="button-generate-test"
+          {/* Progress Steps */}
+          <div className="flex items-center justify-center gap-2">
+            {[1, 2, 3, 4].map((s) => (
+              <div key={s} className="flex items-center">
+                <div 
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                    s === step 
+                      ? 'bg-primary text-primary-foreground' 
+                      : s < step 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-muted text-muted-foreground'
+                  }`}
                 >
-                  {generateTestMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Generating Test...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-5 w-5" />
-                      Generate Test • {TEST_PRICE_SOL} SOL
-                    </>
-                  )}
-                </Button>
+                  {s}
+                </div>
+                {s < 4 && (
+                  <ChevronRight className={`h-5 w-5 mx-2 ${s < step ? 'text-green-500' : 'text-muted-foreground'}`} />
+                )}
               </div>
-            </form>
+            ))}
+          </div>
+
+          {/* Breadcrumbs */}
+          {(mainCategory || narrowCategory || specificCategory) && (
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">Your selection:</p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {mainCategory && (
+                  <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                    {mainCategory}
+                  </span>
+                )}
+                {narrowCategory && (
+                  <>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                      {narrowCategory}
+                    </span>
+                  </>
+                )}
+                {specificCategory && (
+                  <>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                      {specificCategory}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Category Selection or Payment */}
+          <Card className="p-8 sm:p-12 space-y-8 animate-scale-in border-card-border">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold font-serif text-center">
+                {stepTitles[step as keyof typeof stepTitles]}
+              </h2>
+
+              {step <= 3 ? (
+                <>
+                  {loadingCategories ? (
+                    <div className="flex justify-center items-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <span className="ml-3 text-muted-foreground">Loading categories...</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {categories?.categories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          onClick={() => handleCategorySelect(cat.name)}
+                          className="p-4 text-left border-2 border-muted hover:border-primary rounded-lg transition-all hover:shadow-md bg-card"
+                        >
+                          <h3 className="font-semibold text-lg">{cat.name}</h3>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-muted/50 p-6 rounded-lg space-y-3">
+                    <h3 className="font-semibold text-lg">Test Details:</h3>
+                    <div className="space-y-2 text-sm">
+                      <p><span className="font-medium">Category:</span> {mainCategory} → {narrowCategory} → {specificCategory}</p>
+                      <p><span className="font-medium">Questions:</span> 10 questions (10 points each)</p>
+                      <p><span className="font-medium">Passing Score:</span> 70 points minimum</p>
+                      <p><span className="font-medium">Levels:</span></p>
+                      <ul className="ml-6 space-y-1">
+                        <li>• 90-100 points: Senior</li>
+                        <li>• 80-89 points: Middle</li>
+                        <li>• 70-79 points: Junior</li>
+                        <li>• Below 70: No certificate</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <Alert>
+                    <Sparkles className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Payment Required:</strong> {TEST_PRICE_SOL} SOL will be sent to the treasury wallet. 
+                      You'll earn back 10-15% SOL as rewards based on your performance!
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button
+                    onClick={handleGenerateTest}
+                    disabled={generateTestMutation.isPending}
+                    className="w-full h-14 text-lg"
+                    data-testid="button-generate-test"
+                  >
+                    {generateTestMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        {generateTestMutation.isPending ? 'Processing Payment...' : 'Generating Test...'}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-5 w-5" />
+                        Pay {TEST_PRICE_SOL} SOL & Generate Test
+                      </>
+                    )}
+                  </Button>
+
+                  {generateTestMutation.isError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        {generateTestMutation.error instanceof Error 
+                          ? generateTestMutation.error.message 
+                          : 'Failed to generate test. Please try again.'}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Back Button */}
+            {step > 1 && !generateTestMutation.isPending && (
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                className="w-full"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+            )}
           </Card>
 
           {/* Info Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6">
             <Card className="p-6 space-y-3 border-card-border">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30">
-                <span className="text-2xl font-bold text-purple-400">5</span>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/20">
+                <Sparkles className="h-6 w-6 text-purple-500" />
               </div>
-              <h3 className="font-bold font-serif text-lg">Questions</h3>
+              <h3 className="text-lg font-semibold font-serif">10 Questions</h3>
               <p className="text-sm text-muted-foreground">
-                Each test has 5 carefully crafted questions
+                Each question worth 10 points. Total 100 points possible.
               </p>
             </Card>
 
             <Card className="p-6 space-y-3 border-card-border">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30">
-                <Sparkles className="h-6 w-6 text-blue-400" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/20">
+                <AlertCircle className="h-6 w-6 text-green-500" />
               </div>
-              <h3 className="font-bold font-serif text-lg">AI Generated</h3>
+              <h3 className="text-lg font-semibold font-serif">Score 70+ to Pass</h3>
               <p className="text-sm text-muted-foreground">
-                Instant test creation powered by Gemini AI
+                Get 7+ correct answers to earn your NFT certificate.
               </p>
             </Card>
 
             <Card className="p-6 space-y-3 border-card-border">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30">
-                <Award className="h-6 w-6 text-green-400" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20">
+                <Sparkles className="h-6 w-6 text-blue-500" />
               </div>
-              <h3 className="font-bold font-serif text-lg">NFT Reward</h3>
+              <h3 className="text-lg font-semibold font-serif">Earn SOL Rewards</h3>
               <p className="text-sm text-muted-foreground">
-                Earn certificate NFT + SOL rewards
+                Get back 10-15% SOL based on your performance level.
               </p>
             </Card>
           </div>
-
-          {/* Scoring Guide */}
-          <Card className="p-8 space-y-6 bg-card/50 border-card-border">
-            <h3 className="text-2xl font-bold font-serif text-center">Level Achievement Guide</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex flex-col items-center text-center space-y-3 p-6 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20">
-                <div className="px-4 py-2 rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-300 border border-green-500/30 font-bold text-sm">
-                  JUNIOR
-                </div>
-                <p className="text-3xl font-bold">1-2</p>
-                <p className="text-sm text-muted-foreground">correct answers</p>
-              </div>
-
-              <div className="flex flex-col items-center text-center space-y-3 p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
-                <div className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-500/30 font-bold text-sm">
-                  MIDDLE
-                </div>
-                <p className="text-3xl font-bold">3-4</p>
-                <p className="text-sm text-muted-foreground">correct answers</p>
-              </div>
-
-              <div className="flex flex-col items-center text-center space-y-3 p-6 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
-                <div className="px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/30 font-bold text-sm">
-                  SENIOR
-                </div>
-                <p className="text-3xl font-bold">5</p>
-                <p className="text-sm text-muted-foreground">correct answers</p>
-              </div>
-            </div>
-          </Card>
         </div>
       </div>
     </div>
-  );
-}
-
-function Award({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="6" />
-      <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
-    </svg>
   );
 }

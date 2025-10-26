@@ -99,6 +99,9 @@ export default function TestTaking() {
   }
 
   if (showResult && testResult) {
+    const passed = testResult.passed;
+    const scorePercentage = (testResult.score / testResult.totalPoints) * 100;
+
     return (
       <div className="min-h-screen py-12 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -106,40 +109,78 @@ export default function TestTaking() {
             <Card className="p-8 sm:p-12 text-center space-y-8 border-card-border">
               <div className="space-y-4">
                 <div className="flex justify-center">
-                  <Trophy className="h-20 w-20 text-primary" />
+                  {passed ? (
+                    <Trophy className="h-20 w-20 text-primary" />
+                  ) : (
+                    <XCircle className="h-20 w-20 text-destructive" />
+                  )}
                 </div>
-                <h1 className="text-3xl sm:text-4xl font-bold font-serif">Test Completed!</h1>
+                <h1 className="text-3xl sm:text-4xl font-bold font-serif">
+                  {passed ? 'Test Passed!' : 'Test Not Passed'}
+                </h1>
                 <p className="text-lg text-muted-foreground">{testResult.topic}</p>
               </div>
 
               <div className="space-y-6 py-6">
-                <div className="flex justify-center">
-                  <div className={`px-6 py-3 rounded-full border font-bold text-lg ${getLevelBadgeColor(testResult.level)}`}>
-                    {testResult.level.toUpperCase()}
+                {passed && (
+                  <div className="flex justify-center">
+                    <div className={`px-6 py-3 rounded-full border font-bold text-lg ${getLevelBadgeColor(testResult.level)}`}>
+                      {testResult.level.toUpperCase()}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-6 rounded-xl bg-card space-y-2">
-                    <p className="text-sm text-muted-foreground">Score</p>
+                    <p className="text-sm text-muted-foreground">Points</p>
                     <p className="text-3xl font-bold">
-                      {testResult.correctAnswers}/{testResult.totalQuestions}
+                      {testResult.score}/{testResult.totalPoints}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {testResult.correctAnswers} correct out of {testResult.totalQuestions}
                     </p>
                   </div>
                   <div className="p-6 rounded-xl bg-card space-y-2">
                     <p className="text-sm text-muted-foreground">Reward</p>
-                    <p className="text-3xl font-bold text-green-400">
-                      +{testResult.solReward} SOL
+                    <p className={`text-3xl font-bold ${passed ? 'text-green-400' : 'text-muted-foreground'}`}>
+                      {passed ? `+${testResult.solReward} SOL` : '0 SOL'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {passed ? `${(testResult.solReward / TEST_PRICE_SOL * 100).toFixed(0)}% of fee` : 'Need 70+ to earn'}
                     </p>
                   </div>
                 </div>
 
-                <Alert className="border-primary/30 bg-primary/10">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  <AlertDescription className="text-primary">
-                    Your NFT certificate is being minted on Solana devnet!
-                  </AlertDescription>
-                </Alert>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Your Score</span>
+                    <span className="font-semibold">{scorePercentage.toFixed(0)}%</span>
+                  </div>
+                  <Progress value={scorePercentage} className="h-3" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0</span>
+                    <span>70 (Junior)</span>
+                    <span>80 (Middle)</span>
+                    <span>90 (Senior)</span>
+                    <span>100</span>
+                  </div>
+                </div>
+
+                {passed ? (
+                  <Alert className="border-primary/30 bg-primary/10">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <AlertDescription className="text-primary">
+                      🎉 Congratulations! Your NFT certificate is being minted on Solana devnet!
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert variant="destructive">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      You need at least 70 points to earn an NFT certificate. Try again to improve your score!
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4">
@@ -149,15 +190,17 @@ export default function TestTaking() {
                   className="flex-1"
                   data-testid="button-take-another"
                 >
-                  Take Another Test
+                  {passed ? 'Take Another Test' : 'Try Again'}
                 </Button>
-                <Button
-                  onClick={() => setLocation('/profile')}
-                  className="flex-1"
-                  data-testid="button-view-certificates"
-                >
-                  View My Certificates
-                </Button>
+                {passed && (
+                  <Button
+                    onClick={() => setLocation('/profile')}
+                    className="flex-1"
+                    data-testid="button-view-certificates"
+                  >
+                    View My Certificates
+                  </Button>
+                )}
               </div>
             </Card>
           </div>

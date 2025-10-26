@@ -10,31 +10,99 @@ The application combines educational testing with blockchain technology to creat
 
 ## Recent Changes (October 26, 2025)
 
-### Fixed Critical Payment Verification Issues
+### Major System Improvements - Complete Redesign
 
-**Issue #1: Treasury Wallet Mismatch**
-- **Problem:** Treasury wallet addresses were mismatched between frontend and backend, causing SOL to be sent but tests not generated
-- **Solution:** Synchronized treasury wallet address to `9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g` across both frontend and backend
-- **Impact:** Payment verification now works correctly - SOL payments are properly verified before test generation
+**1. Category-Based Test Selection System**
+- **Change:** Replaced free-text topic input with AI-generated category selection
+- **Implementation:** 
+  - Level 1: Select main category (8 options from AI)
+  - Level 2: Select narrow subcategory (6 options from AI)
+  - Level 3: Select specific skill (5 options from AI)
+  - All categories generated dynamically by Gemini AI
+- **Files Changed:**
+  - `client/src/pages/tests.tsx` - Complete UI redesign with step-by-step category selection
+  - `server/gemini.ts` - Added `generateCategories()` function
+  - `server/routes.ts` - Added `/api/categories` endpoint
+  - `shared/schema.ts` - Added category schemas
+- **Impact:** More structured skill assessment with guided navigation through skill trees
 
-**Issue #2: Response Parsing Error (Test Generation)**
-- **Problem:** Frontend was not parsing JSON from server response, causing test data to be lost even when payment was successful
-- **Solution:** Added `.json()` call to parse server response in `client/src/pages/tests.tsx`
-- **Code Change:** Changed from `return response` to `const result = await response.json() as GenerateTestResponse; return result;`
-- **Impact:** Test generation now works end-to-end - after payment, user is redirected to test page with generated questions
+**2. Expanded Test from 5 to 10 Questions**
+- **Change:** Tests now have 10 questions instead of 5, each worth 10 points (100 total)
+- **Implementation:**
+  - Updated Gemini prompts to generate 10 questions
+  - Each question worth 10 points
+  - Questions progress from easier to harder
+- **Files Changed:**
+  - `server/gemini.ts` - Updated `generateTestQuestions()` to create 10 questions
+  - `shared/schema.ts` - Updated schemas for 10 questions and points field
+  - `db/schema.ts` - Added points field to question structure
+- **Impact:** More comprehensive skill assessment with finer-grained scoring
 
-**Issue #3: Response Parsing Error (Test Submission)**
-- **Problem:** After completing a test and clicking submit, the app crashed with "Cannot read properties of undefined (reading 'toUpperCase')" because `testResult.level` was undefined
-- **Solution:** Added `.json()` call to parse server response in `client/src/pages/test-taking.tsx` (same issue as #2)
-- **Code Change:** In `submitTestMutation`, changed from `const result = await apiRequest<TestResult>('POST', '/api/tests/submit', data); return result;` to `const response = await apiRequest('POST', '/api/tests/submit', data); const result = await response.json() as TestResult; return result;`
-- **Impact:** Test submission now works correctly - users see their score, level (Junior/Middle/Senior), SOL reward, and NFT certificate confirmation
+**3. New Scoring System (70-100 Scale)**
+- **Previous:** 5 questions, simple passing threshold
+- **New System:**
+  - 90-100 points: Senior level (15% SOL reward)
+  - 80-89 points: Middle level (12% SOL reward)
+  - 70-79 points: Junior level (10% SOL reward)
+  - Below 70: Failed (no certificate, no reward)
+- **Files Changed:**
+  - `server/routes.ts` - Updated scoring logic in `/api/tests/submit`
+  - `client/src/pages/test-taking.tsx` - Updated result display with progress bar
+  - `shared/schema.ts` - Added `passed` boolean and updated score range
+  - `db/schema.ts` - Added `passed`, `totalPoints`, updated score column
+- **Impact:** Clearer achievement tiers with graduated rewards
+
+**4. PostgreSQL Database Integration**
+- **Change:** Migrated from in-memory storage to PostgreSQL with Drizzle ORM
+- **Implementation:**
+  - Created database schema with proper tables
+  - Added payment signature tracking to prevent replay attacks
+  - Persistent storage for tests, results, certificates, and user stats
+- **Files Changed:**
+  - `db/schema.ts` - Database schema definition
+  - `db/client.ts` - Neon database connection
+  - `server/storage.ts` - Complete rewrite using Drizzle ORM
+  - `server/routes.ts` - Updated to use database for signature tracking
+  - `drizzle.config.ts` - Updated schema path
+- **Impact:** Data persistence across server restarts, improved security
+
+**5. Enhanced NFT Certificate Metadata**
+- **Change:** Improved NFT metadata for better visibility in Solana ecosystem
+- **Implementation:**
+  - Enhanced description with formatted details
+  - More comprehensive attributes (10 total)
+  - Dynamic image generation using DiceBear API
+  - Added achievement tiers (Elite, Advanced, Professional)
+  - Emoji indicators for levels
+- **Files Changed:**
+  - `server/metaplex.ts` - Updated `mintCertificateNFT()` with enhanced metadata
+- **Impact:** NFT certificates now display beautifully in Solana wallets and marketplaces
+
+**6. Vite Configuration for Replit**
+- **Change:** Configured Vite to allow all hosts for Replit proxy
+- **Implementation:**
+  - Added `host: "0.0.0.0"`, `port: 5000`, `allowedHosts: true`
+  - Ensures users can access the app through Replit's iframe proxy
+- **Files Changed:**
+  - `vite.config.ts` - Added server configuration
+- **Impact:** App now accessible to users in Replit environment
+
+**7. Environment Variables & Security**
+- **Change:** Moved treasury wallet to environment variable
+- **Implementation:**
+  - Treasury wallet now uses `process.env.TREASURY_WALLET` with fallback
+  - GEMINI_API_KEY properly configured
+  - DATABASE_URL automatically provided by Replit
+- **Files Changed:**
+  - `server/routes.ts` - Updated to use env var for treasury wallet
+- **Impact:** Better security and easier configuration management
 
 ### Replit Environment Setup
 - Installed all npm dependencies
 - Configured workflow to run development server on port 5000
 - Added GEMINI_API_KEY secret for AI test generation
-- Confirmed DATABASE_URL is available for future PostgreSQL integration
-- Set up deployment configuration for production (autoscale)
+- Created PostgreSQL database and pushed schema
+- Set up deployment configuration for production (autoscale with build step)
 - Created .gitignore file with proper Node.js/TypeScript exclusions
 
 ## User Preferences
