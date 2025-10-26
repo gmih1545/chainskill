@@ -4,8 +4,8 @@ import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/
 export const NETWORK = 'devnet';
 export const connection = new Connection(clusterApiUrl(NETWORK), 'confirmed');
 
-// Test pricing in SOL
-export const TEST_PRICE_SOL = 1;
+// Test pricing in SOL (approximately $20 at average SOL price)
+export const TEST_PRICE_SOL = 0.15;
 export const TEST_PRICE_LAMPORTS = TEST_PRICE_SOL * LAMPORTS_PER_SOL;
 
 // Reward percentage

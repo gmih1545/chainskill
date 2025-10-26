@@ -24,7 +24,8 @@ const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 const TREASURY_WALLET = new PublicKey(
   process.env.TREASURY_WALLET || "9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g"
 );
-const TEST_PRICE_LAMPORTS = 1 * LAMPORTS_PER_SOL;
+// Price set to approximately $20 (0.15 SOL based on average SOL price)
+const TEST_PRICE_LAMPORTS = 0.15 * LAMPORTS_PER_SOL;
 
 // Verify payment transaction on-chain
 async function verifyPaymentTransaction(
@@ -68,8 +69,11 @@ async function verifyPaymentTransaction(
     const preBalances = transaction.meta?.preBalances || [];
     const postBalances = transaction.meta?.postBalances || [];
     
+    // Get account keys - handle both versioned and legacy transactions
+    const staticAccountKeys = accountKeys.staticAccountKeys || [];
+    
     // Find the treasury account index
-    const treasuryIndex = accountKeys.staticAccountKeys.findIndex(
+    const treasuryIndex = staticAccountKeys.findIndex(
       (key) => key.toString() === TREASURY_WALLET.toString()
     );
 
@@ -143,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!paymentValid) {
         return res.status(402).json({ 
-          error: "Payment verification failed. Please ensure you have completed the 1 SOL payment transaction." 
+          error: "Payment verification failed. Please ensure you have completed the 0.15 SOL (~$20) payment transaction." 
         });
       }
       
@@ -172,7 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const response: GenerateTestResponse = {
         test,
         paymentRequired: true,
-        amount: 1, // 1 SOL
+        amount: 0.15, // 0.15 SOL (~$20)
       };
 
       res.json(response);

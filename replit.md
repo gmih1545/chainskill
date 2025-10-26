@@ -2,11 +2,26 @@
 
 ## Overview
 
-SkillChain is a Web3 application built on the Solana blockchain that enables users to earn verifiable NFT certificates by taking skill assessment tests. The platform gamifies professional certification by requiring users to pay 1 SOL to generate AI-powered tests, take the assessment, and receive an NFT certificate representing their achievement level (Junior/Middle/Senior). Users can earn back a portion of their payment as rewards based on test performance.
+SkillChain is a Web3 application built on the Solana blockchain that enables users to earn verifiable NFT certificates by taking skill assessment tests. The platform gamifies professional certification by requiring users to pay 0.15 SOL (~$20) to generate AI-powered tests, take the assessment, and receive an NFT certificate representing their achievement level (Junior/Middle/Senior) stored in Solana ecosystem via Metaplex. Users can earn back a portion of their payment as rewards based on test performance.
 
 The application combines educational testing with blockchain technology to create immutable proof of professional skills, targeting a user experience inspired by modern Web3 platforms (Phantom, Magic Eden) and educational platforms (Duolingo, Coursera).
 
 **Current Environment:** The project is now fully configured and running on Replit.
+
+## Environment Variables
+
+Required:
+- `DATABASE_URL` - PostgreSQL database connection (automatically provided by Replit)
+- `GEMINI_API_KEY` - Google Gemini API key for AI test generation
+
+Optional:
+- `TREASURY_WALLET` - Solana wallet address for receiving test payments (defaults to demo wallet)
+- `METAPLEX_PRIVATE_KEY` - Base58-encoded private key for NFT minting (if not set, uses mock NFTs)
+  - To enable real NFT minting on Solana:
+    1. Create a Solana devnet wallet
+    2. Fund it with devnet SOL (use https://faucet.solana.com/)
+    3. Export the private key in base58 format
+    4. Add as METAPLEX_PRIVATE_KEY secret
 
 ## Recent Changes (October 26, 2025)
 
@@ -157,7 +172,7 @@ Preferred communication style: Simple, everyday language.
 **Key API Flows:**
 
 1. **Test Generation Flow:**
-   - User pays 1 SOL to treasury wallet via Solana transaction
+   - User pays 0.15 SOL (~$20) to treasury wallet via Solana transaction
    - Backend verifies payment on-chain using transaction signature
    - AI generates 5 multiple-choice questions via Gemini API
    - Test stored in memory storage with unique ID

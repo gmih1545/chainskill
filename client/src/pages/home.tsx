@@ -95,7 +95,7 @@ export default function Home() {
               </div>
               <h3 className="text-2xl font-bold font-serif">Solana Powered</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Built on Solana devnet for fast transactions and low costs. Pay 1 SOL per test attempt.
+                Built on Solana devnet for fast transactions and low costs. Pay 0.15 SOL (~$20) per test attempt.
               </p>
             </Card>
           </div>
@@ -124,9 +124,9 @@ export default function Home() {
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-chart-2 text-2xl font-bold text-primary-foreground">
                 2
               </div>
-              <h3 className="text-xl font-bold font-serif">Take Test (1 SOL)</h3>
+              <h3 className="text-xl font-bold font-serif">Take Test (0.15 SOL)</h3>
               <p className="text-muted-foreground">
-                Choose a test and pay 1 SOL to attempt. Pass to earn your certificate.
+                Choose a test and pay 0.15 SOL (~$20) to attempt. Pass to earn your certificate.
               </p>
             </div>
 
