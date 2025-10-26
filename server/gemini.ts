@@ -29,8 +29,8 @@ export async function generateCategories(level: number, parentCategory?: string)
     let userPrompt = "";
 
     if (level === 1) {
-      // Main categories
-      systemPrompt = `You are an expert in professional skills and career development. Generate exactly 8 main professional categories for skill testing.
+      // Main categories - increased to 10
+      systemPrompt = `You are an expert in professional skills and career development. Generate exactly 10 main professional categories for skill testing.
 
 Categories should cover diverse areas like:
 - Technology/Development
@@ -39,7 +39,10 @@ Categories should cover diverse areas like:
 - Marketing/Sales
 - Data/Analytics
 - Operations/Support
-- etc.
+- Finance/Accounting
+- Healthcare/Medical
+- Education/Training
+- Engineering/Manufacturing
 
 Respond with JSON in this exact format:
 {
@@ -47,10 +50,10 @@ Respond with JSON in this exact format:
     { "name": "Category Name" }
   ]
 }`;
-      userPrompt = "Generate 8 diverse main professional categories for skill assessment";
+      userPrompt = "Generate 10 diverse main professional categories for skill assessment";
     } else if (level === 2) {
-      // Narrow categories
-      systemPrompt = `You are an expert in professional skills. Generate exactly 6 narrower subcategories within "${parentCategory}".
+      // Narrow categories - increased to 15
+      systemPrompt = `You are an expert in professional skills. Generate exactly 15 narrower subcategories within "${parentCategory}".
 
 These should be specific areas within ${parentCategory} that professionals specialize in.
 
@@ -60,10 +63,10 @@ Respond with JSON in this exact format:
     { "name": "Subcategory Name" }
   ]
 }`;
-      userPrompt = `Generate 6 specific subcategories within ${parentCategory}`;
+      userPrompt = `Generate 15 specific subcategories within ${parentCategory}`;
     } else {
-      // Specific categories
-      systemPrompt = `You are an expert in professional skills. Generate exactly 5 very specific skill areas within "${parentCategory}".
+      // Specific categories - increased to 20
+      systemPrompt = `You are an expert in professional skills. Generate exactly 20 very specific skill areas within "${parentCategory}".
 
 These should be concrete, testable skills or technologies that professionals work with.
 
@@ -73,7 +76,7 @@ Respond with JSON in this exact format:
     { "name": "Specific Skill Name" }
   ]
 }`;
-      userPrompt = `Generate 5 specific testable skills within ${parentCategory}`;
+      userPrompt = `Generate 20 specific testable skills within ${parentCategory}`;
     }
 
     const response = await ai.models.generateContent({

@@ -172,6 +172,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Save test to storage
       await storage.createTest(test);
+      console.log(`✅ Test created successfully with ID: ${test.id}`);
+      
+      // Verify test was saved by trying to read it back
+      const savedTest = await storage.getTest(test.id);
+      if (!savedTest) {
+        console.error(`❌ ERROR: Test ${test.id} was not saved properly!`);
+        throw new Error("Test was not saved to database");
+      }
+      console.log(`✅ Test ${test.id} verified in database`);
 
       const response: GenerateTestResponse = {
         test,

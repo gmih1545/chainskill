@@ -25,6 +25,41 @@ Optional:
 
 ## Recent Changes (October 26, 2025)
 
+### Latest Updates - Import and Bug Fixes
+
+**1. Expanded Category Selection (10/15/20 categories)**
+- **Change:** Increased category count at all levels for more diverse testing
+- **Implementation:**
+  - Level 1: 10 main professional categories (was 8)
+  - Level 2: 15 narrow subcategories (was 6)
+  - Level 3: 20 specific skills (was 5)
+- **Files Changed:**
+  - `server/gemini.ts` - Updated category generation counts
+- **Impact:** Much wider selection of skills and topics for users to test
+
+**2. Test Not Found Bug Fix**
+- **Problem:** Users reported "Test not found" error after payment
+- **Solution:**
+  - Added database verification after test creation
+  - Added retry logic (3 attempts, 1s delay) in frontend
+  - Enhanced logging for debugging
+- **Files Changed:**
+  - `server/routes.ts` - Added verification step after test creation
+  - `client/src/pages/test-taking.tsx` - Added retry logic to test fetching
+- **Impact:** More reliable test creation and loading
+
+**3. NFT Metaplex Integration Status**
+- **Current State:** Metaplex NFT minting is ALREADY implemented!
+- **How to Enable Real NFTs:**
+  1. Create a Solana devnet wallet (use Phantom or solana-keygen)
+  2. Fund it with devnet SOL: https://faucet.solana.com/
+  3. Export the private key in base58 format
+  4. Add it as `METAPLEX_PRIVATE_KEY` secret in Replit
+- **Files:** `server/metaplex.ts` - Full Metaplex integration ready
+- **Current Behavior:** Uses mock NFTs if METAPLEX_PRIVATE_KEY not set
+
+## Recent Changes (October 26, 2025) - Initial Setup
+
 ### Major System Improvements - Complete Redesign
 
 **1. Category-Based Test Selection System**

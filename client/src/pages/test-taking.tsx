@@ -20,14 +20,22 @@ export default function TestTaking() {
   const [showResult, setShowResult] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
-  const { data: test, isLoading } = useQuery<Test>({
+  const { data: test, isLoading, error } = useQuery<Test>({
     queryKey: ['/api/tests', testId],
     queryFn: async () => {
+      console.log(`Fetching test with ID: ${testId}`);
       const response = await fetch(`/api/tests/${testId}`);
-      if (!response.ok) throw new Error('Failed to fetch test');
-      return response.json();
+      if (!response.ok) {
+        console.error(`Failed to fetch test ${testId}: ${response.status} ${response.statusText}`);
+        throw new Error('Failed to fetch test');
+      }
+      const data = await response.json();
+      console.log(`Test loaded successfully:`, data);
+      return data;
     },
     enabled: !!testId,
+    retry: 3, // Retry up to 3 times
+    retryDelay: 1000, // Wait 1 second between retries
   });
 
   const submitTestMutation = useMutation({

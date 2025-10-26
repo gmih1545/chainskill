@@ -35,6 +35,19 @@ export class PostgresStorage implements IStorage {
     if (!result || !Array.isArray(result) || result.length === 0) return undefined;
     
     const row = result[0];
+    
+    // Safely handle createdAt - convert to ISO string or use current time
+    let createdAtString: string;
+    if (row.createdAt && row.createdAt instanceof Date) {
+      createdAtString = row.createdAt.toISOString();
+    } else if (row.createdAt) {
+      // If it's a string or timestamp, try to convert
+      createdAtString = new Date(row.createdAt).toISOString();
+    } else {
+      // Fallback to current time if null
+      createdAtString = new Date().toISOString();
+    }
+    
     return {
       id: row.id,
       topic: row.topic,
@@ -48,7 +61,7 @@ export class PostgresStorage implements IStorage {
         correctAnswer: number;
         points: number;
       }>,
-      createdAt: row.createdAt.toISOString(),
+      createdAt: createdAtString,
     };
   }
 
